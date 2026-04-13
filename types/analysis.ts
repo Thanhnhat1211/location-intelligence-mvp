@@ -1,0 +1,255 @@
+/**
+ * Location Intelligence - Analysis Types
+ * Định nghĩa các kiểu dữ liệu cho phân tích kinh doanh và định giá
+ */
+
+import { Location, Coordinates } from "./location";
+
+/**
+ * Business model types for analysis
+ */
+export type BusinessModel = "fnb" | "airbnb" | "retail";
+
+/**
+ * Risk severity levels
+ */
+export type RiskSeverity = "low" | "medium" | "high";
+
+/**
+ * Analysis filter options for querying
+ */
+export interface AnalysisFilters {
+  /** Business model to analyze */
+  businessModel: BusinessModel;
+  /** Target monthly revenue (VND) */
+  targetRevenue?: number;
+  /** Maximum acceptable monthly rent (VND) */
+  maxRent?: number;
+  /** Minimum area size (m²) */
+  minArea?: number;
+  /** Maximum area size (m²) */
+  maxArea?: number;
+  /** Specific districts to analyze */
+  districts?: string[];
+  /** Search radius from coordinates (km) */
+  radius?: number;
+  /** Center coordinates for radius search */
+  centerCoordinates?: Coordinates;
+  /** Include high-risk areas */
+  includeHighRisk?: boolean;
+}
+
+/**
+ * Business fit score for a specific business model
+ */
+export interface BusinessFitScore {
+  /** Business model type */
+  businessModel: BusinessModel;
+  /** Overall fit score (0-100) */
+  overallScore: number;
+  /** Location score (0-100) - proximity to target customers */
+  locationScore: number;
+  /** Demographic score (0-100) - population & income match */
+  demographicScore: number;
+  /** Competition score (0-100) - competitive landscape */
+  competitionScore: number;
+  /** Foot traffic score (0-100) - pedestrian activity */
+  footTrafficScore: number;
+  /** Infrastructure score (0-100) - utilities & access */
+  infrastructureScore: number;
+  /** Breakdown of score components with weights */
+  breakdown: {
+    category: string;
+    score: number;
+    weight: number;
+    description: string;
+  }[];
+  /** Confidence level (0-1) */
+  confidence: number;
+}
+
+/**
+ * Nearby business information
+ */
+export interface NearbyBusiness {
+  /** Business name */
+  name: string;
+  /** Business category */
+  category: string;
+  /** Business type (competitor, complementary, etc.) */
+  type: "competitor" | "complementary" | "neutral";
+  /** Distance from analyzed location (km) */
+  distance: number;
+  /** Estimated monthly revenue (VND) */
+  estimatedRevenue?: number;
+  /** Customer rating (0-5) */
+  rating?: number;
+  /** Number of reviews */
+  reviewCount?: number;
+  /** Business coordinates */
+  coordinates: Coordinates;
+}
+
+/**
+ * Price estimation for the location
+ */
+export interface PriceEstimate {
+  /** Estimated monthly rent (VND) */
+  monthlyRent: number;
+  /** Rent confidence interval - lower bound (VND) */
+  rentMin: number;
+  /** Rent confidence interval - upper bound (VND) */
+  rentMax: number;
+  /** Giá thuê trung bình khu vực (VND/m²/tháng) */
+  averageRentPerSqm: number;
+  /** Estimated property price (VND) - if buying */
+  propertyPrice?: number;
+  /** Property price confidence interval - lower bound (VND) */
+  propertyPriceMin?: number;
+  /** Property price confidence interval - upper bound (VND) */
+  propertyPriceMax?: number;
+  /** Comparable properties used in estimation */
+  comparableCount: number;
+  /** Price trend in the area */
+  priceTrend: "increasing" | "stable" | "decreasing";
+  /** Predicted 6-month price change (%) */
+  predictedChangePercent: number;
+  /** Last updated timestamp */
+  lastUpdated: string;
+}
+
+/**
+ * Risk flag for the location
+ */
+export interface RiskFlag {
+  /** Unique identifier */
+  id: string;
+  /** Risk category */
+  category: "legal" | "market" | "competition" | "infrastructure" | "economic";
+  /** Risk severity */
+  severity: RiskSeverity;
+  /** Risk title */
+  title: string;
+  /** Detailed description */
+  description: string;
+  /** Potential impact description */
+  impact: string;
+  /** Mitigation recommendations */
+  mitigation?: string;
+  /** Probability of occurrence (0-1) */
+  probability: number;
+}
+
+/**
+ * AI-generated strategy memo
+ */
+export interface StrategyMemo {
+  /** Executive summary */
+  summary: string;
+  /** Key strengths of the location */
+  strengths: string[];
+  /** Key weaknesses to consider */
+  weaknesses: string[];
+  /** Business opportunities */
+  opportunities: string[];
+  /** Potential threats */
+  threats: string[];
+  /** Actionable recommendations */
+  recommendations: {
+    priority: "high" | "medium" | "low";
+    action: string;
+    expectedImpact: string;
+  }[];
+  /** ROI projection (monthly) */
+  roiProjection: {
+    /** Expected monthly revenue (VND) */
+    expectedRevenue: number;
+    /** Expected monthly costs (VND) */
+    expectedCosts: number;
+    /** Expected monthly profit (VND) */
+    expectedProfit: number;
+    /** Break-even timeline (months) */
+    breakEvenMonths: number;
+    /** ROI percentage (annual) */
+    annualROI: number;
+  };
+  /** Generated by AI model */
+  generatedBy: string;
+  /** Generation timestamp */
+  generatedAt: string;
+}
+
+/**
+ * Area summary statistics
+ */
+export interface AreaSummary {
+  /** Total businesses in area */
+  totalBusinesses: number;
+  /** Businesses by category */
+  businessesByCategory: {
+    category: string;
+    count: number;
+    percentage: number;
+  }[];
+  /** Average foot traffic score (0-100) */
+  averageFootTraffic: number;
+  /** Average rent in area (VND/m²/month) */
+  averageRent: number;
+  /** Vacancy rate (%) */
+  vacancyRate: number;
+  /** Market saturation for business model (0-100) */
+  marketSaturation: number;
+  /** Growth rate trend (%) */
+  growthRate: number;
+  /** Peak business hours */
+  peakHours: string[];
+  /** Seasonal trends */
+  seasonalTrends?: {
+    season: "spring" | "summer" | "fall" | "winter";
+    demandLevel: "low" | "medium" | "high";
+  }[];
+}
+
+/**
+ * Complete analysis result for a location
+ */
+export interface AnalysisResult {
+  /** Unique analysis identifier */
+  id: string;
+  /** Location being analyzed */
+  location: Location;
+  /** Applied filters */
+  filters: AnalysisFilters;
+  /** Business fit scores for all models */
+  businessFitScores: BusinessFitScore[];
+  /** Nearby businesses data */
+  nearbyBusinesses: NearbyBusiness[];
+  /** Price estimation */
+  priceEstimate: PriceEstimate;
+  /** Identified risk flags */
+  riskFlags: RiskFlag[];
+  /** Area summary statistics */
+  areaSummary: AreaSummary;
+  /** AI-generated strategy memo */
+  strategyMemo: StrategyMemo;
+  /** Overall recommendation */
+  recommendation: "highly-recommended" | "recommended" | "neutral" | "not-recommended";
+  /** Confidence score for the analysis (0-100) */
+  confidenceScore: number;
+  /** Analysis status */
+  status: "pending" | "processing" | "completed" | "failed";
+  /** Error message if failed */
+  error?: string;
+  /** User who created the analysis */
+  userId?: string;
+  /** Saved/bookmarked by user */
+  isSaved: boolean;
+  /** User notes */
+  notes?: string;
+  /** Analysis creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
+  /** Analysis completion timestamp */
+  completedAt?: string;
+}

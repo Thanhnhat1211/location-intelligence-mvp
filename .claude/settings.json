@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -X POST http://localhost:3099/api/analyze -H 'Content-Type: application/json' -d '{:*)",
+      "Bash(python3 -c ':*)",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "WebFetch(domain:velvety-biscotti-b2e0d9.netlify.app)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 18148)",
+      "WebFetch(domain:localhost)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl -s http://localhost:3000/_next/static/css/29cc893ab12dfcef.css)",
+      "Bash(ls c:/Users/TNhat/Documents/location-intelligence-mvp/postcss*)",
+      "Bash(cat c:/Users/TNhat/Documents/location-intelligence-mvp/.postcssrc*)"
+    ]
+  }
+}

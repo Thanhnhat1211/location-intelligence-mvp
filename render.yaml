@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: location-intelligence-mvp
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATA_DIR
+        value: /var/data/location-intel
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false  # set manually in Render dashboard
+    disk:
+      name: data
+      mountPath: /var/data/location-intel
+      sizeGB: 1

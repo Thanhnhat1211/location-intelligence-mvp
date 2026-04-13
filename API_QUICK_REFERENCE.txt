@@ -1,0 +1,470 @@
+================================================================================
+  LOCATION INTELLIGENCE MVP - API QUICK REFERENCE GUIDE
+  Generated: 27 March 2026
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        API ENDPOINTS OVERVIEW (9 ROUTES)                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+1. LOCATION ANALYSIS ENDPOINT
+═══════════════════════════════════════════════════════════════════════════════
+
+  📍 POST /api/analyze
+  ─────────────────────────────────────────────────────────────────────────────
+  Analyze a location for business viability (F&B, Airbnb, Retail)
+  
+  REQUEST BODY:
+    {
+      "location": {
+        "lat": number,
+        "lng": number,
+        "address": string
+      },
+      "filters": {
+        "businessModel": "fnb" | "airbnb" | "retail",
+        "radius": number (meters),
+        "weights": { optional scoring weights }
+      }
+    }
+  
+  RESPONSE:
+    ✓ 200 OK
+    ✗ 400 Bad Request (invalid location/filter)
+    ✗ 500 Server Error
+  
+  RETURNS: {
+    id, timestamp, location, filters, score, areaInfo, nearbyBusinesses,
+    priceEstimate, traffic, recommendations, risks
+  }
+  
+  USE CASES:
+    • Quick site evaluation for potential F&B location
+    • Airbnb property investment analysis
+    • Retail store location feasibility study
+    • Competitive landscape assessment
+    • ROI projection for different business models
+
+
+═══════════════════════════════════════════════════════════════════════════════
+2. ANALYSIS HISTORY - LIST
+═══════════════════════════════════════════════════════════════════════════════
+
+  📍 GET /api/history
+  ─────────────────────────────────────────────────────────────────────────────
+  Retrieve all saved analyses with optional filtering
+  
+  QUERY PARAMETERS:
+    ?limit=10              (default: 50, max: 100)
+    ?offset=0              (pagination)
+    ?businessModel=fnb     (filter by business model)
+    ?status=completed      (pending, processing, completed, failed)
+  
+  RESPONSE:
+    ✓ 200 OK
+    ✗ 400 Bad Request (invalid params)
+  
+  RETURNS: {
+    analyses: AnalysisResult[],
+    total: number,
+    limit: number,
+    offset: number
+  }
+  
+  USE CASES:
+    • Browse previous site analyses
+    • Filter analyses by business model
+    • Pagination through large analysis history
+    • Export analysis list for reporting
+
+
+═══════════════════════════════════════════════════════════════════════════════
+3. ANALYSIS HISTORY - DETAIL
+═══════════════════════════════════════════════════════════════════════════════
+
+  📍 GET /api/history/[id]
+  ─────────────────────────────────────────────────────────────────────────────
+  Retrieve detailed analysis by ID
+  
+  URL PARAMETERS:
+    id: string (UUID or analysis ID)
+  
+  RESPONSE:
+    ✓ 200 OK
+    ✗ 404 Not Found
+    ✗ 500 Server Error
+  
+  RETURNS: {
+    Complete AnalysisResult object with all details:
+    - Business fit scores (all 3 models)
+    - Nearby businesses competitive analysis
+    - Price estimation with confidence intervals
+    - Risk flags categorized by severity
+    - Strategy memo with recommendations
+  }
+  
+  USE CASES:
+    • View full analysis details after completion
+    • Review strategy memo and recommendations
+    • Check identified risks and mitigations
+    • Compare multiple analyses side-by-side
+    • Archive/print analysis reports
+
+
+═══════════════════════════════════════════════════════════════════════════════
+4. ANALYSIS HISTORY - UPDATE
+═══════════════════════════════════════════════════════════════════════════════
+
+  📍 PATCH /api/history/[id]
+  ─────────────────────────────────────────────────────────────────────────────
+  Update analysis (save bookmarks, add notes, change status)
+  
+  URL PARAMETERS:
+    id: string (analysis ID)
+  
+  REQUEST BODY:
+    {
+      "isSaved": boolean,          (bookmark/unbookmark)
+      "notes": string,             (user notes)
+      "status": "completed" | ..., (update status)
+      "recommendation": "..."      (override recommendation)
+    }
+  
+  RESPONSE:
+    ✓ 200 OK (updated analysis)
+    ✗ 404 Not Found
+    ✗ 400 Bad Request
+  
+  USE CASES:
+    • Bookmark favorite analyses
+    • Add personal notes to analysis
+    • Mark analysis as reviewed
+    • Override AI recommendation after manual review
+
+
+═══════════════════════════════════════════════════════════════════════════════
+5. ANALYSIS HISTORY - DELETE
+═══════════════════════════════════════════════════════════════════════════════
+
+  📍 DELETE /api/history/[id]
+  ─────────────────────────────────────────────────────────────────────────────
+  Delete an analysis record permanently
+  
+  URL PARAMETERS:
+    id: string (analysis ID)
+  
+  RESPONSE:
+    ✓ 204 No Content (success)
+    ✗ 404 Not Found
+    ✗ 500 Server Error
+  
+  USE CASES:
+    • Remove duplicate analyses
+    • Clean up historical data
+    • Delete analyses created by mistake
+    • Manage database storage
+
+
+═══════════════════════════════════════════════════════════════════════════════
+6. COMPARABLE PROPERTIES - UPLOAD CSV
+═══════════════════════════════════════════════════════════════════════════════
+
+  📍 POST /api/upload-comps
+  ─────────────────────────────────────────────────────────────────────────────
+  Batch import property comparables from CSV file
+  
+  REQUEST (multipart/form-data):
+    file: File (CSV format)
+  
+  CSV REQUIRED COLUMNS:
+    • Địa chỉ (address) or 'address'
+    • Quận (district) or 'district'
+    • Giá (price) or 'price'
+    • Diện tích (area) or 'area'
+  
+  CSV OPTIONAL COLUMNS:
+    • Phòng ngủ (bedrooms), Phòng tắm (bathrooms)
+    • Loại (propertyType), Ngày bán (saleDate)
+    • Vĩ độ/Kinh độ (latitude/longitude), etc.
+  
+  RESPONSE:
+    ✓ 200 OK
+    ✗ 400 Bad Request (invalid file/format)
+    ✗ 413 Payload Too Large (>10MB)
+    ✗ 415 Unsupported Media Type
+  
+  RETURNS: {
+    uploadId, status, totalRows, successCount, failedCount, errors,
+    warnings, summary (newComps, updatedComps, duplicates),
+    processingTime, uploadedAt
+  }
+  
+  USE CASES:
+    • Import property data from CRM/database
+    • Bulk update comparable dataset
+    • Migrate data from other platforms
+    • Add market comps to analysis engine
+    • Create baseline pricing database
+
+
+═══════════════════════════════════════════════════════════════════════════════
+7. COMPARABLE PROPERTIES - STATS
+═══════════════════════════════════════════════════════════════════════════════
+
+  📍 GET /api/dataset/stats
+  ─────────────────────────────────────────────────────────────────────────────
+  Get dataset statistics and data quality metrics
+  
+  QUERY PARAMETERS:
+    ?district=Quận1        (optional filter)
+    ?propertyType=shophouse (optional filter)
+  
+  RESPONSE:
+    ✓ 200 OK
+    ✗ 500 Server Error
+  
+  RETURNS: {
+    totalComps, compsByType, compsByDistrict, compsByTransactionType,
+    priceStats (avg, median, min, max, per sqm),
+    rentStats (avg, median, min, max, per sqm),
+    areaStats (avg, median, min, max),
+    dataQuality (verified%, coordinates%, completeness score),
+    dateRange (earliest, latest, recency days),
+    lastUpdated
+  }
+  
+  USE CASES:
+    • Monitor dataset health and completeness
+    • Understand market price ranges
+    • Check data recency and coverage
+    • Validate data quality before analysis
+    • Generate dataset quality reports
+
+
+═══════════════════════════════════════════════════════════════════════════════
+8. COMPARABLE PROPERTIES - LIST
+═══════════════════════════════════════════════════════════════════════════════
+
+  📍 GET /api/dataset
+  ─────────────────────────────────────────────────────────────────────────────
+  Search and filter comparable properties
+  
+  QUERY PARAMETERS:
+    ?district=Quận1         (search by district)
+    ?propertyType=retail    (apartment, house, commercial, land, villa, shophouse)
+    ?minPrice=5000000       (minimum price)
+    ?maxPrice=500000000     (maximum price)
+    ?minArea=20             (minimum area m²)
+    ?maxArea=200            (maximum area m²)
+    ?limit=50               (pagination)
+    ?offset=0               (pagination)
+    ?sort=price|date|area   (sort by field)
+  
+  RESPONSE:
+    ✓ 200 OK
+    ✗ 400 Bad Request (invalid filters)
+  
+  RETURNS: {
+    comps: PropertyComp[],
+    total: number,
+    limit: number,
+    offset: number,
+    filters: applied filters
+  }
+  
+  USE CASES:
+    • Find market comparables for a property
+    • Research pricing in specific districts
+    • Build comp analysis for valuation
+    • Identify property type trends
+    • Benchmark rental rates
+
+
+═══════════════════════════════════════════════════════════════════════════════
+9. COMPARABLE PROPERTIES - EXPORT
+═══════════════════════════════════════════════════════════════════════════════
+
+  📍 GET /api/dataset/export
+  ─────────────────────────────────────────────────────────────────────────────
+  Export comparable data as CSV file
+  
+  QUERY PARAMETERS:
+    ?district=Quận1         (filter before export)
+    ?propertyType=retail
+    ?format=csv             (default: csv)
+    ?filename=my_comps      (optional custom filename)
+  
+  RESPONSE:
+    ✓ 200 OK (CSV file download)
+    ✗ 400 Bad Request
+    ✗ 404 Not Found (no matching comps)
+  
+  HEADERS:
+    Content-Type: text/csv
+    Content-Disposition: attachment; filename="comps.csv"
+  
+  USE CASES:
+    • Download filtered comps for Excel analysis
+    • Share data with team members
+    • Archive dataset snapshots
+    • Integration with external tools
+    • Create custom reports
+
+
+═══════════════════════════════════════════════════════════════════════════════
+QUICK RESPONSE STATUS CODES
+═══════════════════════════════════════════════════════════════════════════════
+
+  200 OK              Data retrieved/updated successfully
+  201 Created         New resource created (analysis, comps)
+  204 No Content      Deletion successful
+  400 Bad Request     Invalid parameters or malformed request
+  404 Not Found       Resource doesn't exist
+  413 Payload Too Large  File exceeds size limit
+  415 Unsupported Media  Wrong file format
+  500 Server Error    Internal server issue
+
+
+═══════════════════════════════════════════════════════════════════════════════
+SCORING WEIGHTS (for /api/analyze)
+═══════════════════════════════════════════════════════════════════════════════
+
+  Optional custom weights for business fit score calculation:
+  
+  {
+    "location": 20,        (proximity to target customers %)
+    "demographic": 20,     (population & income match %)
+    "competition": 15,     (competitive landscape %)
+    "footTraffic": 20,     (pedestrian activity %)
+    "infrastructure": 25   (utilities & accessibility %)
+  }
+  
+  Total: 100%
+
+
+═══════════════════════════════════════════════════════════════════════════════
+BUSINESS MODEL TYPES
+═══════════════════════════════════════════════════════════════════════════════
+
+  "fnb"       → Food & Beverage (cafes, restaurants)
+  "airbnb"    → Short-term accommodation (homestays, apartments)
+  "retail"    → Retail stores (fashion, electronics, convenience)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+DATA STRUCTURES - PROPERTY COMP
+═══════════════════════════════════════════════════════════════════════════════
+
+  {
+    id: string,
+    address: { full, district, street },
+    coordinates: { lat, lng },
+    area: number (m²),
+    bedrooms?: number,
+    bathrooms?: number,
+    propertyType: string,
+    soldPrice?: number (VND),
+    monthlyRent?: number (VND),
+    pricePerSqm: number,
+    rentPerSqm?: number,
+    transactionType: "sale" | "rent" | "both",
+    status: "active" | "sold" | "rented" | "expired",
+    listingDate: string (ISO),
+    verified: boolean
+  }
+
+
+═══════════════════════════════════════════════════════════════════════════════
+COMMON ERROR RESPONSES
+═══════════════════════════════════════════════════════════════════════════════
+
+  Invalid Location:
+    { "error": "Không tìm thấy thông tin khu vực" }
+    
+  CSV Parse Error:
+    { "error": "Lỗi parse CSV: [details]" }
+    
+  Duplicate Analysis:
+    { "error": "Analysis with this ID already exists" }
+    
+  Missing Required Fields:
+    { "error": "Missing required field: [field_name]" }
+
+
+═══════════════════════════════════════════════════════════════════════════════
+AUTHENTICATION & RATE LIMITING
+═══════════════════════════════════════════════════════════════════════════════
+
+  Currently: No authentication required (MVP phase)
+  Rate Limits: To be implemented
+  CORS: Configured for development
+
+
+═══════════════════════════════════════════════════════════════════════════════
+EXAMPLE CURL COMMANDS
+═══════════════════════════════════════════════════════════════════════════════
+
+  1. Analyze Location:
+    curl -X POST http://localhost:3000/api/analyze \
+      -H "Content-Type: application/json" \
+      -d '{
+        "location": {"lat": 10.8050, "lng": 106.7138, "address": "123 Điện Biên Phủ, Q.Bình Thạnh"},
+        "filters": {"businessModel": "fnb", "radius": 500}
+      }'
+
+  2. Get Analysis History:
+    curl http://localhost:3000/api/history?limit=10&status=completed
+
+  3. Get Single Analysis:
+    curl http://localhost:3000/api/history/abc-123-def
+
+  4. Upload Comps CSV:
+    curl -X POST http://localhost:3000/api/upload-comps \
+      -F "file=@comps.csv"
+
+  5. Get Dataset Stats:
+    curl http://localhost:3000/api/dataset/stats
+
+  6. Search Comps:
+    curl "http://localhost:3000/api/dataset?district=Quận1&minPrice=5000000"
+
+  7. Export Comps:
+    curl http://localhost:3000/api/dataset/export?district=Quận1 > comps.csv
+
+
+═══════════════════════════════════════════════════════════════════════════════
+NOTES FOR DEVELOPERS
+═══════════════════════════════════════════════════════════════════════════════
+
+  • All timestamps are in ISO 8601 format (UTC)
+  • All Vietnamese currency values in VND (Vietnamese Dong)
+  • Coordinates use WGS84 (lat/lng format)
+  • Analysis IDs are unique identifiers (UUID-like)
+  • Scores range from 0-100 (percentage)
+  • Confidence values range from 0-1 (0.0 to 1.0)
+  • File uploads max 10MB
+  • CSV files must be UTF-8 encoded
+  • Analysis processing time ~800ms (simulated)
+  • Data persistence using file-based JSON storage (data/ directory)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+ENDPOINT SUMMARY TABLE
+═══════════════════════════════════════════════════════════════════════════════
+
+  #  METHOD  PATH                    PURPOSE
+  ───────────────────────────────────────────────────────────────────────────
+   1  POST    /api/analyze            Analyze location for business viability
+   2  GET     /api/history            List all analyses (paginated, filterable)
+   3  GET     /api/history/[id]       Get detailed analysis by ID
+   4  PATCH   /api/history/[id]       Update analysis (notes, bookmark, status)
+   5  DELETE  /api/history/[id]       Delete analysis
+   6  POST    /api/upload-comps       Import properties from CSV file
+   7  GET     /api/dataset/stats      Get dataset statistics & quality metrics
+   8  GET     /api/dataset            Search & filter comparable properties
+   9  GET     /api/dataset/export     Export comps as CSV file
+
+================================================================================
+                       End of Quick Reference Guide
+================================================================================
