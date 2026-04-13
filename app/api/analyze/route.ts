@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeLocation } from "@/lib/analysis-engine";
-import { enhanceStrategyMemo } from "@/lib/openai";
+import { enhanceStrategyMemo } from "@/lib/ai-client";
 import { saveAnalysis } from "@/lib/file-store";
 import type { AnalysisFilters } from "@/types/analysis";
 

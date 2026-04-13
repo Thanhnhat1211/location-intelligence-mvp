@@ -215,13 +215,13 @@ export function ApiStatusCard({
       </div>
 
       <div className="space-y-6">
-        {/* OpenAI API */}
+        {/* Claude API */}
         <div className="space-y-3 pb-6 border-b">
           <div className="flex items-center justify-between">
             <div>
-              <Label className="text-base font-medium">OpenAI API</Label>
+              <Label className="text-base font-medium">Claude API</Label>
               <p className="text-sm text-muted-foreground mt-1">
-                Sử dụng cho phân tích AI và tạo strategy memo
+                Sử dụng Claude AI cho phân tích và tạo strategy memo
               </p>
             </div>
             {(() => {
