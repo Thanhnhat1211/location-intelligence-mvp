@@ -111,15 +111,19 @@ export function calculateLocationScore(
   }
 
   // High business density indicates good commercial area
+  // Density = businesses per 1000 people
   const businessDensity = areaInfo.business.totalBusinesses / (areaInfo.demographics.population / 1000);
-  if (businessDensity > 5) score += 15;
-  else if (businessDensity > 3) score += 10;
-  else if (businessDensity > 1) score += 5;
+  if (businessDensity > 30) score += 15; // Very commercial (CBD-like)
+  else if (businessDensity > 15) score += 10;
+  else if (businessDensity > 8) score += 5;
+  else if (businessDensity < 3) score -= 5; // Too residential
 
-  // Central districts (1, 3) get bonus
-  if (areaInfo.id === "district-1" || areaInfo.id === "district-3") {
-    score += 10;
-  }
+  // CBD bonus (applies to all central business districts, not just D1/D3)
+  if (areaInfo.isCBD) score += 10;
+
+  // Growth trend affects long-term location value
+  if (areaInfo.growthTrend === "rapid") score += 5;
+  else if (areaInfo.growthTrend === "slow") score -= 3;
 
   return Math.min(Math.max(score, 0), 100);
 }
@@ -189,13 +193,14 @@ export function calculateDemographicScore(
 }
 
 /**
- * Calculate competition score (lower competition = higher score)
+ * Calculate competition score (lower competition = higher score).
+ * Uses distance-weighted and rating-weighted approach for accuracy.
  */
 export function calculateCompetitionScore(
   nearbyBusinesses: NearbyBusiness[],
   businessModel: BusinessModel
 ): number {
-  let score = 75; // Start optimistic
+  let score = 72; // Start neutral-positive
 
   const relevantTypes: Record<BusinessModel, NearbyBusiness["type"][]> = {
     fnb: ["cafe", "restaurant"],
@@ -207,31 +212,33 @@ export function calculateCompetitionScore(
     relevantTypes[businessModel].includes(b.type)
   );
 
-  // Competition density analysis
+  // Distance-banded competition count
   const veryClose = competitors.filter((b) => b.distance <= 200).length;
-  const close = competitors.filter((b) => b.distance <= 350).length;
-  const nearby = competitors.length;
+  const close = competitors.filter((b) => b.distance <= 350 && b.distance > 200).length;
+  const far = competitors.filter((b) => b.distance > 350).length;
 
-  // Heavy competition penalty for very close competitors
-  score -= veryClose * 8;
-  score -= (close - veryClose) * 5;
-  score -= (nearby - close) * 2;
+  // Heavy penalty for very close competitors
+  score -= veryClose * 7;
+  score -= close * 4;
+  score -= far * 1.5;
 
-  // Check average rating of competitors
-  if (competitors.length > 0) {
+  // Average rating of competitors — strong competitors hurt more
+  if (competitors.length >= 2) {
     const avgRating = competitors.reduce((sum, b) => sum + b.rating, 0) / competitors.length;
-    
-    // High-rated competition is tougher
-    if (avgRating >= 4.5) score -= 10;
-    else if (avgRating >= 4.0) score -= 5;
-    else score += 5; // Weak competition is opportunity
+    if (avgRating >= 4.5) score -= 8;
+    else if (avgRating >= 4.0) score -= 4;
+    else if (avgRating < 3.5) score += 6; // Weak competition = opportunity
   }
 
-  // Sweet spot: some competition but not oversaturated
+  // Market validation sweet spot (3-7 competitors = proven demand + manageable competition)
   if (businessModel === "fnb" || businessModel === "retail") {
-    if (nearby >= 3 && nearby <= 8) score += 10; // Proven demand
-    else if (nearby < 2) score -= 5; // Maybe poor location
-    else if (nearby > 15) score -= 15; // Oversaturated
+    if (competitors.length >= 3 && competitors.length <= 7) score += 8;
+    else if (competitors.length < 2) score -= 4; // No validation
+    else if (competitors.length > 12) score -= 12; // Oversaturated
+  } else if (businessModel === "airbnb") {
+    // Airbnb benefits from hospitality cluster (tourists know where to go)
+    if (competitors.length >= 2 && competitors.length <= 5) score += 10;
+    else if (competitors.length > 8) score -= 8;
   }
 
   return Math.min(Math.max(score, 0), 100);
