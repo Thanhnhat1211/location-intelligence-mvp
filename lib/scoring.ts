@@ -44,16 +44,19 @@ const DEFAULT_WEIGHTS: Record<BusinessModel, ScoringWeights> = {
 };
 
 /**
- * Main scoring function - calculates business fit score for a location
+ * Main scoring function - calculates business fit score for a location.
+ * Optionally accepts pre-fetched businesses (e.g., from real OSM data)
+ * to avoid double-fetching.
  */
 export function calculateBusinessFitScore(
   location: { lat: number; lng: number; address?: string },
   businessModel: BusinessModel,
-  customWeights?: Partial<ScoringWeights>
+  customWeights?: Partial<ScoringWeights>,
+  prefetchedBusinesses?: NearbyBusiness[]
 ): LocationScore {
   const weights = { ...DEFAULT_WEIGHTS[businessModel], ...customWeights };
   const areaInfo = getMockAreaInfo(location);
-  const nearbyBusinesses = getMockNearbyBusinesses(location, 500);
+  const nearbyBusinesses = prefetchedBusinesses ?? getMockNearbyBusinesses(location, 500);
 
   if (!areaInfo) {
     return {

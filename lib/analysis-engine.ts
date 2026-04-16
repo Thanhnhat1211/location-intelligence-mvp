@@ -35,7 +35,16 @@ import type {
   NearbyBusiness as MockNearbyBusiness,
 } from "./mock-data";
 import { SeededRandom, coordSeed } from "./seeded-random";
+import { fetchNearbyBusinessesOSM } from "./overpass-client";
+import { reverseGeocode } from "./nominatim-client";
+import type { ResolvedAddress } from "./nominatim-client";
 import { generateId } from "./utils";
+
+/**
+ * Data sources used in this analysis. Exposed so UI can show honest
+ * provenance ("data from OpenStreetMap" vs "estimated from district stats").
+ */
+export type DataSource = "osm" | "mock" | "mixed";
 
 export interface AnalyzeLocationInput {
   coordinates: Coordinates;
@@ -85,9 +94,6 @@ export async function analyzeLocation(
   input: AnalyzeLocationInput,
   filters: AnalysisFilters
 ): Promise<AnalysisResult> {
-  // Simulate processing delay
-  await new Promise((resolve) => setTimeout(resolve, 800));
-
   const { coordinates, addressText } = input;
   const mockLoc = {
     lat: coordinates.lat,
@@ -101,23 +107,44 @@ export async function analyzeLocation(
     throw new Error("Không tìm thấy thông tin khu vực");
   }
 
-  const mockBusinesses = getMockNearbyBusinesses(mockLoc, radius);
+  // Fetch real data in parallel (OSM + Nominatim) with mock fallback
+  const [osmBusinesses, resolvedAddress] = await Promise.all([
+    fetchNearbyBusinessesOSM(mockLoc, radius).catch(() => null),
+    reverseGeocode(mockLoc.lat, mockLoc.lng).catch(() => null),
+  ]);
+
+  const businesses = osmBusinesses && osmBusinesses.length >= 3
+    ? osmBusinesses
+    : getMockNearbyBusinesses(mockLoc, radius);
+  const dataSource: DataSource = osmBusinesses && osmBusinesses.length >= 3 ? "osm" : "mock";
+
   const mockPrice = getMockPriceEstimate(mockLoc);
   const trafficData = getMockTrafficData(mockLoc);
 
+  // Pass real businesses into scoring for accurate competition score
   const primaryScore = calculateBusinessFitScore(
     mockLoc,
-    filters.businessModel
+    filters.businessModel,
+    undefined,
+    businesses
   );
 
   const now = new Date().toISOString();
-  const dataConfidence = calculateDataConfidence(mockLoc, areaInfo, mockBusinesses.length);
+  const dataConfidence = calculateDataConfidence(
+    mockLoc,
+    areaInfo,
+    businesses.length,
+    dataSource,
+    !!resolvedAddress
+  );
 
-  const location = buildLocation(coordinates, areaInfo, addressText, filters.minArea);
-  const businessFitScores = buildBusinessFitScores(mockLoc, dataConfidence);
-  const nearbyBusinesses = buildNearbyBusinesses(mockBusinesses, filters.businessModel, mockLoc);
+  const location = buildLocation(
+    coordinates, areaInfo, addressText, filters.minArea, resolvedAddress
+  );
+  const businessFitScores = buildBusinessFitScores(mockLoc, dataConfidence, businesses);
+  const nearbyBusinesses = buildNearbyBusinesses(businesses, filters.businessModel, mockLoc);
   const priceEstimate = buildPriceEstimate(mockLoc, areaInfo, mockPrice, now);
-  const riskFlags = buildRiskFlags(primaryScore, areaInfo, mockBusinesses, filters.businessModel);
+  const riskFlags = buildRiskFlags(primaryScore, areaInfo, businesses, filters.businessModel);
   const areaSummary = buildAreaSummary(mockLoc, areaInfo, primaryScore, trafficData);
   const strategyMemo = buildStrategyMemo(
     primaryScore,
@@ -127,7 +154,8 @@ export async function analyzeLocation(
     filters.businessModel,
     mockLoc,
     filters.minArea || areaInfo.realEstate.avgPropertySize,
-    now
+    now,
+    dataSource
   );
 
   return {
@@ -157,7 +185,9 @@ export async function analyzeLocation(
 function calculateDataConfidence(
   loc: { lat: number; lng: number },
   district: DistrictData,
-  businessCount: number
+  businessCount: number,
+  dataSource: DataSource,
+  hasResolvedAddress: boolean
 ): number {
   // Distance from district center (closer = more confident)
   const cosLat = Math.cos(loc.lat * (Math.PI / 180));
@@ -168,12 +198,16 @@ function calculateDataConfidence(
   // < 1km: full confidence; > 5km: reduced confidence
   const proximityScore = Math.max(0, Math.min(1, 1 - (distFromCenter - 1000) / 4000));
 
-  // Data richness based on businesses found and district size
+  // Data richness based on businesses found
   const dataScore = Math.min(1, businessCount / 15);
 
-  // Combined confidence: 0.55 floor + up to 0.40 from quality signals
-  const combined = 0.55 + proximityScore * 0.25 + dataScore * 0.15;
-  return Math.round(combined * 100) / 100;
+  // Real OSM data boosts confidence substantially
+  const sourceBoost = dataSource === "osm" ? 0.12 : 0;
+  const addressBoost = hasResolvedAddress ? 0.05 : 0;
+
+  // Combined: 0.50 floor + up to 0.50 from quality signals
+  const combined = 0.50 + proximityScore * 0.20 + dataScore * 0.13 + sourceBoost + addressBoost;
+  return Math.round(Math.min(0.98, combined) * 100) / 100;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,17 +218,18 @@ function buildLocation(
   coordinates: Coordinates,
   areaInfo: DistrictData,
   addressText?: string,
-  minArea?: number
+  minArea?: number,
+  resolved?: ResolvedAddress | null
 ): Location {
   return {
     coordinates,
     address: {
-      full: addressText || `${areaInfo.name}, TP. Hồ Chí Minh`,
-      street: "",
-      ward: "",
-      district: areaInfo.name,
-      city: "TP. Hồ Chí Minh",
-      country: "Việt Nam",
+      full: resolved?.fullAddress || addressText || `${areaInfo.name}, TP. Hồ Chí Minh`,
+      street: resolved?.street || "",
+      ward: resolved?.ward || "",
+      district: resolved?.district || areaInfo.name,
+      city: resolved?.city || "TP. Hồ Chí Minh",
+      country: resolved?.country || "Việt Nam",
     },
     area: minArea || areaInfo.realEstate.avgPropertySize,
     type: "commercial",
@@ -203,13 +238,14 @@ function buildLocation(
 
 function buildBusinessFitScores(
   mockLoc: { lat: number; lng: number },
-  dataConfidence: number
+  dataConfidence: number,
+  businesses: MockNearbyBusiness[]
 ): BusinessFitScore[] {
   const models: BusinessModel[] = ["fnb", "airbnb", "retail"];
 
   return models
     .map((model) => {
-      const score = calculateBusinessFitScore(mockLoc, model);
+      const score = calculateBusinessFitScore(mockLoc, model, undefined, businesses);
 
       const footTrafficScore = Math.min(100, Math.max(0, Math.round(
         score.breakdown.location * 0.6 + score.breakdown.infrastructure * 0.4
@@ -515,7 +551,8 @@ function buildStrategyMemo(
   businessModel: BusinessModel,
   loc: { lat: number; lng: number; address: string },
   area: number,
-  now: string
+  now: string,
+  dataSource: DataSource
 ): StrategyMemo {
   const modelLabels: Record<BusinessModel, string> = {
     fnb: "F&B",
@@ -560,7 +597,10 @@ function buildStrategyMemo(
     threats,
     recommendations,
     roiProjection,
-    generatedBy: "Location Intelligence AI Engine v1.0",
+    generatedBy:
+      dataSource === "osm"
+        ? "Local Engine v1.0 + OpenStreetMap data"
+        : "Local Engine v1.0 (district stats fallback)",
     generatedAt: now,
   };
 }

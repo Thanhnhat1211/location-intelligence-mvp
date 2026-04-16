@@ -20,10 +20,6 @@ interface MapPreviewCardProps {
 export function MapPreviewCard({ location, nearbyBusinesses = [] }: MapPreviewCardProps) {
   const { coordinates, address } = location;
 
-  // Generate Google Maps static image URL
-  const mapImageUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${coordinates.lat},${coordinates.lng}&zoom=15&size=600x400&markers=color:red%7C${coordinates.lat},${coordinates.lng}&key=YOUR_GOOGLE_MAPS_API_KEY`;
-
-  // Fallback placeholder
   const placeholderMap = (
     <div className="w-full h-[300px] bg-gradient-to-br from-blue-100 to-green-100 flex items-center justify-center rounded-lg">
       <div className="text-center">
