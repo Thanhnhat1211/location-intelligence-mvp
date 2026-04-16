@@ -1,16 +1,32 @@
 /**
  * District data and deterministic data generation for HCMC.
  *
- * Key design decisions:
- * - All 17 major districts/cities of HCMC included with realistic statistics
- *   based on publicly available census and market data (2023-2024).
- * - All "random" generation uses SeededRandom keyed to coordinates,
- *   so the same location always produces the same results.
- * - Business density, traffic estimates, and prices are derived from
- *   district-level data with location-specific micro-variation.
+ * IMPORTANT — admin units context (2025+):
+ * Vietnam restructured its administrative units in mid-2025. The old "Quận X"
+ * level was reorganized and many wards were merged. The 17 entries below
+ * intentionally remain keyed to the legacy district names because they
+ * represent stable *demographic / commercial zones* — the macro patterns
+ * (population, income tier, business density) carry over even after admin
+ * boundaries shifted. For the legally-current ward/district name shown to
+ * users, we always defer to Nominatim's reverse-geocode output (see
+ * `buildLocation` in analysis-engine.ts).
+ *
+ * Data lineage:
+ * - Demographics & infrastructure: 2024 estimates from GSO + various market
+ *   reports (Savills, CBRE, JLL Q4 2024). Not officially audited.
+ * - Real-estate prices (rent/sale): 2024 averages. For *current-state* prices
+ *   the system prefers user-uploaded comps via /api/upload-comps, falling
+ *   back to these averages only when no nearby comps exist.
+ *
+ * Determinism:
+ * - All "random" generation uses SeededRandom keyed to coordinates so the
+ *   same location always produces the same output.
  */
 
 import { SeededRandom, coordSeed } from "./seeded-random";
+
+/** When the bundled district statistics were compiled. */
+export const DISTRICT_DATA_AS_OF = "2024-Q4";
 
 // ---------------------------------------------------------------------------
 // Types

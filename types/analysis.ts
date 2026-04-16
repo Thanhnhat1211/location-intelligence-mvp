@@ -116,6 +116,15 @@ export interface PriceEstimate {
   predictedChangePercent: number;
   /** Last updated timestamp */
   lastUpdated: string;
+  /**
+   * Where the rent/sale numbers came from. "comps" = from real uploaded
+   * property comparables nearby; "district-average" = fallback to bundled
+   * district-level statistics; "mixed" = some fields from comps, others
+   * from district averages.
+   */
+  priceSource?: "comps" | "district-average" | "mixed";
+  /** Median age (in days) of the comps used, when priceSource includes comps. */
+  compsMedianAgeDays?: number;
 }
 
 /**

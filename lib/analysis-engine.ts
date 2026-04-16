@@ -38,6 +38,10 @@ import { SeededRandom, coordSeed } from "./seeded-random";
 import { fetchNearbyBusinessesOSM } from "./overpass-client";
 import { reverseGeocode } from "./nominatim-client";
 import type { ResolvedAddress } from "./nominatim-client";
+import {
+  estimatePriceFromComps,
+  estimateRentFromComps,
+} from "./comps-pricing";
 import { generateId } from "./utils";
 
 /**
@@ -118,6 +122,12 @@ export async function analyzeLocation(
     : getMockNearbyBusinesses(mockLoc, radius);
   const dataSource: DataSource = osmBusinesses && osmBusinesses.length >= 3 ? "osm" : "mock";
 
+  // Pull real-comps pricing in parallel; null if not enough nearby comps
+  const targetArea = filters.minArea || areaInfo.realEstate.avgPropertySize;
+  const [compsPrice, compsRent] = await Promise.all([
+    estimatePriceFromComps(mockLoc, targetArea).catch(() => null),
+    estimateRentFromComps(mockLoc, targetArea).catch(() => null),
+  ]);
   const mockPrice = getMockPriceEstimate(mockLoc);
   const trafficData = getMockTrafficData(mockLoc);
 
@@ -143,7 +153,9 @@ export async function analyzeLocation(
   );
   const businessFitScores = buildBusinessFitScores(mockLoc, dataConfidence, businesses);
   const nearbyBusinesses = buildNearbyBusinesses(businesses, filters.businessModel, mockLoc);
-  const priceEstimate = buildPriceEstimate(mockLoc, areaInfo, mockPrice, now);
+  const priceEstimate = buildPriceEstimate(
+    mockLoc, areaInfo, mockPrice, now, compsPrice, compsRent
+  );
   const riskFlags = buildRiskFlags(primaryScore, areaInfo, businesses, filters.businessModel);
   const areaSummary = buildAreaSummary(mockLoc, areaInfo, primaryScore, trafficData);
   const strategyMemo = buildStrategyMemo(
@@ -320,10 +332,23 @@ function buildPriceEstimate(
   loc: { lat: number; lng: number },
   areaInfo: DistrictData,
   mockPrice: ReturnType<typeof getMockPriceEstimate>,
-  now: string
+  now: string,
+  compsPrice: import("./comps-pricing").CompsPriceEstimate | null,
+  compsRent: import("./comps-pricing").RentEstimate | null
 ): PriceEstimate {
-  const avgRent = areaInfo.realEstate.avgRentPrice;
   const avgSize = areaInfo.realEstate.avgPropertySize || 50;
+
+  // Rent: prefer comps when available
+  const monthlyRent = compsRent?.monthlyRent ?? areaInfo.realEstate.avgRentPrice;
+  const rentMin = compsRent?.range.min ?? Math.round(monthlyRent * 0.85);
+  const rentMax = compsRent?.range.max ?? Math.round(monthlyRent * 1.15);
+  const rentPerSqm = compsRent?.rentPerSqm ?? Math.round(monthlyRent / avgSize);
+
+  // Sale price: prefer comps when available
+  const propertyPrice = compsPrice?.estimatedPrice ?? mockPrice.estimatedPrice;
+  const propertyPriceMin = compsPrice?.range.min ?? mockPrice.range.min;
+  const propertyPriceMax = compsPrice?.range.max ?? mockPrice.range.max;
+  const comparableCount = compsPrice?.comparables ?? mockPrice.comparables;
 
   // Price trend deterministically derived from district growth trend
   const trendMap: Record<DistrictData["growthTrend"], {
@@ -340,18 +365,25 @@ function buildPriceEstimate(
   const rng = new SeededRandom(coordSeed(loc.lat, loc.lng) + 4);
   const predictedChangePercent = Math.round((changePercent + rng.float(-1, 1)) * 10) / 10;
 
+  let priceSource: PriceEstimate["priceSource"];
+  if (compsPrice && compsRent) priceSource = "comps";
+  else if (compsPrice || compsRent) priceSource = "mixed";
+  else priceSource = "district-average";
+
   return {
-    monthlyRent: avgRent,
-    rentMin: Math.round(avgRent * 0.85),
-    rentMax: Math.round(avgRent * 1.15),
-    averageRentPerSqm: Math.round(avgRent / avgSize),
-    propertyPrice: mockPrice.estimatedPrice,
-    propertyPriceMin: mockPrice.range.min,
-    propertyPriceMax: mockPrice.range.max,
-    comparableCount: mockPrice.comparables,
+    monthlyRent,
+    rentMin,
+    rentMax,
+    averageRentPerSqm: rentPerSqm,
+    propertyPrice,
+    propertyPriceMin,
+    propertyPriceMax,
+    comparableCount,
     priceTrend: trend,
     predictedChangePercent,
     lastUpdated: now,
+    priceSource,
+    compsMedianAgeDays: compsPrice?.medianAgeDays,
   };
 }
 

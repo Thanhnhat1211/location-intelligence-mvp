@@ -72,12 +72,34 @@ export function PriceEstimateCard({ priceEstimate }: PriceEstimateCardProps) {
             <h3 className="text-lg font-semibold mb-1">Ước tính giá thuê</h3>
             <p className="text-sm text-muted-foreground">
               Dựa trên {priceEstimate.comparableCount} bất động sản tương tự
+              {priceEstimate.compsMedianAgeDays !== undefined && (
+                <span className="text-xs ml-1">
+                  (giao dịch trung vị {priceEstimate.compsMedianAgeDays} ngày trước)
+                </span>
+              )}
             </p>
           </div>
-          <Badge variant="outline" className="flex items-center gap-1">
-            {getTrendIcon()}
-            {getTrendLabel()}
-          </Badge>
+          <div className="flex flex-col items-end gap-1.5">
+            <Badge variant="outline" className="flex items-center gap-1">
+              {getTrendIcon()}
+              {getTrendLabel()}
+            </Badge>
+            {priceEstimate.priceSource === "comps" && (
+              <Badge className="bg-green-600 hover:bg-green-700 text-white text-xs">
+                Dữ liệu thật
+              </Badge>
+            )}
+            {priceEstimate.priceSource === "mixed" && (
+              <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-xs">
+                Một phần dữ liệu thật
+              </Badge>
+            )}
+            {priceEstimate.priceSource === "district-average" && (
+              <Badge variant="secondary" className="text-xs">
+                Ước tính theo khu vực
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Monthly Rent */}
