@@ -14,26 +14,38 @@ const ANALYSES_FILE = path.join(DATA_DIR, "analyses.json");
 const COMPS_FILE = path.join(DATA_DIR, "comps.json");
 
 /**
- * Ensure data directory and files exist
+ * Ensure data directory and files exist.
+ * On read-only filesystems (Vercel serverless), all writes throw EROFS —
+ * we swallow those so callers can still attempt reads (which return [] on
+ * miss). Only callers that genuinely need to write will surface the error.
  */
 async function ensureDataFiles(): Promise<void> {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== "EROFS" && code !== "EACCES") throw err;
+    return; // Read-only FS — nothing we can ensure
+  }
 
+  try {
+    await fs.access(ANALYSES_FILE);
+  } catch {
     try {
-      await fs.access(ANALYSES_FILE);
-    } catch {
       await fs.writeFile(ANALYSES_FILE, JSON.stringify([], null, 2));
-    }
-
-    try {
-      await fs.access(COMPS_FILE);
     } catch {
-      await fs.writeFile(COMPS_FILE, JSON.stringify([], null, 2));
+      /* read-only */
     }
-  } catch (error) {
-    console.error("Error ensuring data files:", error);
-    throw error;
+  }
+
+  try {
+    await fs.access(COMPS_FILE);
+  } catch {
+    try {
+      await fs.writeFile(COMPS_FILE, JSON.stringify([], null, 2));
+    } catch {
+      /* read-only */
+    }
   }
 }
 

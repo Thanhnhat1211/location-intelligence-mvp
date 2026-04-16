@@ -62,8 +62,18 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // 3. Save to file storage
-    const savedResult = await saveAnalysis(result);
+    // 3. Save to file storage. On read-only filesystems (e.g. Vercel
+    //    serverless), this throws — but the analysis itself is valid, so we
+    //    return it anyway. History persistence simply won't work.
+    let savedResult = result;
+    try {
+      savedResult = await saveAnalysis(result);
+    } catch (err) {
+      console.warn(
+        "[analyze] saveAnalysis failed (likely read-only FS), returning unsaved result:",
+        err instanceof Error ? err.message : err
+      );
+    }
 
     return NextResponse.json(savedResult, { status: 201 });
   } catch (error) {
